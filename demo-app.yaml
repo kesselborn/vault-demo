@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: demo-app
+  name: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: demo-app
+    spec:
+      volumes:
+        - emptyDir: {}
+          name: shared
+      containers:
+      - image: vault
+        imagePullPolicy: IfNotPresent
+        name: vault-agent
+        command: ["/usr/bin/tail", "-f", "/dev/null"]
+        resources: {}
+        volumeMounts:
+          - name: shared
+            mountPath: /config
+      - image: mysql
+        imagePullPolicy: IfNotPresent
+        name: app
+        resources: {}
+        command:
+          - sh
+          - -c
+          - |
+            echo "waiting for script to become available"
+            while true
+            do
+              test -e /config/mysql-script && /config/mysql-script
+              sleep 1
+            done
+        volumeMounts:
+          - name: shared
+            mountPath: /config
+status: {}

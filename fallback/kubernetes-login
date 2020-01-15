@@ -1,0 +1,2 @@
+apk add --no-cache curl jq
+curl -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login

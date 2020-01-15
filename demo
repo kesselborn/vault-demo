@@ -1,0 +1,227 @@
+#!/bin/sh
+
+KINDCONFIG=kind.kubeconfig
+CLUSTER_NAME=vault-demo
+INGRESS_PORT_HTTP=81   # must not be used by somebody else
+INGRESS_PORT_HTTPS=444 # must not be used by somebody else
+
+_functions() {
+  grep '\(^[A-Za-z].*()[ ]*{\|^###*$\)' $0|grep -v '^__'|sed -e 's/^/	/g' -e "s/^###*/\\\n/g"|tr -d '(){#'
+}
+
+_usage() {
+  cat<<EOF
+Usage: $0 COMMAND
+
+available commands:
+  $(echo "$(_functions)")
+EOF
+}
+
+_wait() {
+  if [ "$?" = "0" ]
+  then
+    read -p "💤  "
+  fi
+}
+
+_install_kind() {
+  test -e ./kind && return
+  curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.6.1/kind-$(uname)-amd64
+  chmod +x ./kind
+}
+
+install_vault() {                # install local vault cli (mac os only) #
+  which vault &>/dev/null || brew install vault
+}
+
+#####################
+
+launch_kind_cluster() {          # launch kind cluster for experimentation
+  set -e
+  _install_kind
+  KUBECONFIG=${KINDCONFIG} kubectl cluster-info &>/dev/null && return
+  cat<<-EOF>kind.conf
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    apiVersion: kubeadm.k8s.io/v1beta2
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+        authorization-mode: "AlwaysAllow"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: ${INGRESS_PORT_HTTP}
+  - containerPort: 443
+    hostPort: ${INGRESS_PORT_HTTPS}
+	EOF
+
+  ./kind create cluster  --name ${CLUSTER_NAME} --kubeconfig ${KINDCONFIG} --config kind.conf
+
+  printf "waiting for node to become ready "
+  (set +x
+  for _ in $(seq 0 120)
+  do
+    sleep 1
+    printf "."
+    kubectl get nodes|grep " Ready " && break
+  done
+  )
+
+
+}
+
+delete_kind_cluster() {          # deletes the kind cluster
+  ./kind delete cluster --name ${CLUSTER_NAME} --kubeconfig ${KINDCONFIG}
+}
+
+load_image() {                   # load docker image into cluster
+  local image_name=$1
+  : ${image_name:?}
+  (set -x; ./kind load docker-image --name ${CLUSTER_NAME} --nodes ${CLUSTER_NAME}-control-plane "${image_name}")
+}
+
+pause_kind_cluster() {           # pauses the kind cluster
+  docker pause ${CLUSTER_NAME}-control-plane
+}
+
+unpause_kind_cluster() {         # pauses the kind cluster
+  docker unpause ${CLUSTER_NAME}-control-plane
+}
+
+install_ingress_controller() {   # installs and sets up ingress controller
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/mandatory.yaml
+  kubectl patch deployments -n ingress-nginx nginx-ingress-controller -p '{"spec":{"template":{"spec":{"containers":[{"name":"nginx-ingress-controller","ports":[{"containerPort":80,"hostPort":80},{"containerPort":443,"hostPort":443}]}],"nodeSelector":{"ingress-ready":"true"},"tolerations":[{"key":"node-role.kubernetes.io/master","operator":"Equal","effect":"NoSchedule"}]}}}}'
+}
+
+################
+
+init_vault() {                   # init vault
+  (set -x; vault operator init |tee keys)
+}
+
+unseal_vault() {                 # unseal vault
+  local key_no=${1:?pass in the unsealing number -- info will be read from file 'keys'}
+  local unsealing_key=$(cat keys |grep "Key ${key_no}:"|cut -f2 -d:)
+  : ${unsealing_key:?}
+
+  (set -x; vault operator unseal ${unsealing_key})
+}
+
+root_token() {                   # get and export vault token
+  local token=$(cat keys|grep "Token:"|cut -f2 -d:)
+  : ${token}
+  echo "eval this command!" >&2
+  echo "export VAULT_TOKEN='${token}'"
+}
+
+enable_audit_log() {             # enables audit log for vault
+  (set -x; vault audit enable file file_path=/tmp/audit.log)
+}
+
+enable_kv_secret_backend() {     # enables kv secret backend
+  (set -x; vault secrets enable -version=2 kv)
+}
+
+create_vault_user() {            # create username/password auth with foo/bar user
+  (set -x; vault auth enable userpass)
+  _wait
+  (set -x; vault write auth/userpass/users/foo \
+    password=bar \
+    policies=testdb-ro,kv-foo
+  )
+  _wait
+  (set -x
+  vault login -method=userpass \
+    username=foo \
+    password=bar
+  )
+}
+
+enable_mysql() {                 # enables mysql secrets engine and configuration
+  (set -x; vault secrets enable database)
+  _wait
+
+  (set -x
+  vault write database/config/testdb \
+    plugin_name=mysql-database-plugin \
+    connection_url="{{username}}:{{password}}@tcp(mysql:3306)/" \
+    allowed_roles="testdb-ro,testdb-rw" \
+    username="root" \
+    password="mypass"
+  )
+
+  _wait
+  (set -x
+  vault write database/roles/testdb-ro \
+    db_name=testdb \
+    creation_statements="CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT SELECT ON *.* TO '{{name}}'@'%';" \
+    default_ttl="10s" \
+    max_ttl="10s"
+  )
+
+  _wait
+  (set -x
+  vault write database/roles/testdb-rw \
+    db_name=testdb \
+    creation_statements="CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT ALL ON *.* TO '{{name}}'@'%';" \
+    default_ttl="10s" \
+    max_ttl="10s"
+  )
+
+  _wait
+  (set -x
+  vault read database/creds/testdb-rw
+  )
+}
+
+enable_k8s_auth() {              # enables kubernetes authentication
+  (set -x; kubectl apply -f vault-sa.yaml)
+  _wait
+
+  (set -x; vault auth enable kubernetes)
+  _wait
+
+  local vault_auth_sa_secret=$(kubectl get sa vault-auth -ojson|jq -r ".secrets[0].name")
+  local ca=$(kubectl get secret ${vault_auth_sa_secret} -ojson|jq -r ".data[\"ca.crt\"]"|base64 --decode)
+  local token=$(kubectl get secret ${vault_auth_sa_secret} -ojson|jq -r ".data.token"|base64 --decode)
+
+  (set -x
+  vault write auth/kubernetes/config \
+    token_reviewer_jwt="${token}" \
+    kubernetes_host=https://kubernetes \
+    kubernetes_ca_cert="${ca}"
+  )
+  _wait
+
+  (set -x
+  vault write auth/kubernetes/role/test \
+    bound_service_account_names=default \
+    bound_service_account_namespaces=default \
+    policies=testdb-ro \
+    ttl=1h
+  )
+}
+
+###########
+
+install_kubernetes_apps() {      # installs demo apps (vault, mysql, ...)
+  echo "tbd"
+}
+
+if [ -z "$1" ] || ! echo $(_functions)|grep $1 >/dev/null
+then
+  _usage
+  exit 1
+fi
+
+export VAULT_ADDR=${VAULT_ADDR:=http://localhost:8200}
+test -e ${KINDCONFIG} && export KUBECONFIG=${KINDCONFIG}
+
+"$@"
+

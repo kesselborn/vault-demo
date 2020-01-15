@@ -1,0 +1,6 @@
+/ca.crt
+/keys
+/kind
+/kind.conf
+/kind.kubeconfig
+/testdb-role-policy.hcl

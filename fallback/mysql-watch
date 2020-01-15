@@ -1,0 +1,1 @@
+while true; do clear; date; echo "select user from user;"|mysql -uroot -pmypass -Dmysql; sleep 2; done
