@@ -72,9 +72,12 @@ nodes:
     kubectl get nodes|grep " Ready " && break
   done
   )
-
-
 }
+
+install_kubernetes_apps() {      # installs demo apps (vault, mysql, ...)
+  ls *.yaml|xargs -n1 kubectl apply -f
+}
+
 
 delete_kind_cluster() {          # deletes the kind cluster
   ./kind delete cluster --name ${CLUSTER_NAME} --kubeconfig ${KINDCONFIG}
@@ -100,6 +103,9 @@ install_ingress_controller() {   # installs and sets up ingress controller
 }
 
 ################
+install_k8s_pods() {             # installs vault, mysql and demo app to kubernetes
+  (set -x; ls mysql.yaml vault.yaml demo-app.yaml|xargs -n1 kubectl apply -f)
+}
 
 init_vault() {                   # init vault
   (set -x; vault operator init |tee keys)
@@ -113,11 +119,11 @@ unseal_vault() {                 # unseal vault
   (set -x; vault operator unseal ${unsealing_key})
 }
 
-root_token() {                   # get and export vault token
+set_vault_env() {                # get and export vault token and vault addr
   local token=$(cat keys|grep "Token:"|cut -f2 -d:)
   : ${token}
-  echo "eval this command!" >&2
   echo "export VAULT_TOKEN='${token}'"
+  echo "export VAULT_ADDR='${VAULT_ADDR}'"
 }
 
 enable_audit_log() {             # enables audit log for vault
@@ -209,10 +215,6 @@ enable_k8s_auth() {              # enables kubernetes authentication
 }
 
 ###########
-
-install_kubernetes_apps() {      # installs demo apps (vault, mysql, ...)
-  echo "tbd"
-}
 
 if [ -z "$1" ] || ! echo $(_functions)|grep $1 >/dev/null
 then

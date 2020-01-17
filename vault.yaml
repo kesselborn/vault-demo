@@ -20,6 +20,7 @@ spec:
     spec:
       containers:
       - image: vault
+        imagePullPolicy: IfNotPresent
         env:
           - name: VAULT_LOCAL_CONFIG
             value: |
