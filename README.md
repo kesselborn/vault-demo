@@ -21,25 +21,25 @@ In order to run the demo, the script expects the following evironment:
 
 2. for our demo, we will use Kubernetes in Docker. The demo script assumes you have docker running and the current user is allowed to use docker. Start the Kubernetes cluster with: 
 
-      ./demo launch_kind_cluster
-      export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
+       ./demo launch_kind_cluster
+       export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
 
 3. install vault, mysql and the demo app into the kubernetes cluster (it basically applies vault.yaml, mysql.yaml, demo-app.yaml)
 
-      ./demo install_k8s_pods
-      kubectl get pods
+       ./demo install_k8s_pods
+       kubectl get pods
 
    if you are in an offline situation and you have the docker containers mysql and vault locally available, you can upload then into your kind cluster by executing
 
-      ./demo load_image vault
-      ./demo load_image mysql
+       ./demo load_image vault
+       ./demo load_image mysql
 
    wait until all pods are in state running:
 
-      $ kubectl get pods
-      demo-app-84b77c7f9-zdpd4   2/2     Running   0          3m19s
-      mysql-f998d4f87-m8wf8      1/1     Running   0          3m19s
-      vault-5558555bd8-7cppv     1/1     Running   0          32s
+       $ kubectl get pods
+       demo-app-84b77c7f9-zdpd4   2/2     Running   0          3m19s
+       mysql-f998d4f87-m8wf8      1/1     Running   0          3m19s
+       vault-5558555bd8-7cppv     1/1     Running   0          32s
 
 4. in order to be able to talk to the vault within the kubernetes cluster, we need to create a tunnel. Open another terminal and execute (within the demo folder)
 
