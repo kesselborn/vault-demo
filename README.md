@@ -14,6 +14,7 @@ In order to run the demo, the script expects the following evironment:
 
 - a running docker installation + access to use docker
 - the kubernetes cli tool `kubectl`
+- for vault-k8s: install [Helm 3](https://helm.sh/docs/intro/install/)
 
 # Demo script:
 
@@ -117,4 +118,61 @@ In order to run the demo, the script expects the following evironment:
         export VAULT_ADDR=http://vault:8200
         export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
         vault read database/creds/testdb-ro
+
+
+## Alternative: use Vault-k8s
+
+This example [installs vault with helm](https://github.com/hashicorp/vault-helm) and injects [vault-agent](https://www.vaultproject.io/docs/agent) automatically using [vault-k8s](https://github.com/hashicorp/vault-k8s) 
+
+1. cleanup cluster (or if you start from here, follow steps 1 and 2 above)
+
+````
+   kubectl delete -f vault.yaml demo-app.yaml
+````
+
+2. run vault again using helm chart
+
+   ```sh
+   helm install vault \
+       --values vault-values.yaml \
+       https://github.com/hashicorp/vault-helm/archive/v0.5.0.tar.gz
+   ```
+```
+
+3. start mysql
+
+```
+   kubectl apply -f mysql.yaml
+   ```
+
+4. folllow steps 4-7 above to initiallize vault
+
+5. enable mysql backend
+
+   ```sh
+   ./demo enable_mysql
+   ```
+
+6. enable kubernetes authentication backend
+
+       ./demo enable_k8s_auth
+
+7. jump into the vault agent pod and start vault agent with `vault-agent.hcl` config:
+
+   ```sh
+   vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
+   ```
+
+8. start the demo-app, containing annotations that configure the vault-agent sidecar deployment 
+
+   ```sh
+   kubectl apply -f demo-app-inject.yaml
+   ```
+
+   check the logs for users created by the vault-agent sidecar (using the same sidecar)
+
+   ```sh
+   DEMO_POD=$(kubectl get pod -l app=demo-app-inject -o jsonpath="{.items[0].metadata.name}")
+   kubectl logs $DEMO_POD app
+   ```
 

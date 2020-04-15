@@ -1,0 +1,54 @@
+---
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: demo-app-sa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: demo-app-inject
+  name: demo-app-inject
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app-inject
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: demo-app-inject
+      annotations:
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/role: 'test'
+        vault.hashicorp.com/agent-inject-secret-db: database/creds/testdb-ro
+        vault.hashicorp.com/agent-inject-template-db: |
+          {{- with secret "database/creds/testdb-ro" }}
+          for _ in $(seq 1 50); do echo; done
+          date
+          set -x
+          echo "show tables;"|mysql -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmysql
+          echo "select user from user;"|mysql -u{{ .Data.username }} -p{{ .Data.password }} -Dmysql -hmysql
+          {{ end }}
+    spec:
+      containers:
+      - image: mysql
+        imagePullPolicy: IfNotPresent
+        name: app
+        resources: {}
+        command:
+          - sh
+          - -c
+          - |
+            echo "waiting for script to become available"
+            while true
+            do
+              test -e /vault/secrets/db && chmod +x /vault/secrets/db && /vault/secrets/db
+              sleep 1
+            done
+      serviceAccountName: demo-app-sa
+status: {}
