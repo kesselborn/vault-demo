@@ -29,7 +29,7 @@ In order to run the demo, the script expects the following evironment:
        ./demo install_k8s_pods
        kubectl get pods
 
-   if you are in an offline situation and you have the docker containers mysql and vault locally available, you can upload then into your kind cluster by executing
+  if you are in an offline situation and you have the docker images mysql and vault locally available, you can upload then into your kind cluster by executing
 
        ./demo load_image vault
        ./demo load_image mysql
@@ -48,7 +48,7 @@ In order to run the demo, the script expects the following evironment:
 
 5. go back to your original terminal and initialize vault with
 
-       ./demo initialize_vault
+      ./demo init_vault
 
    this will show you the output that vault will give you and store this output in a file called `keys` for later usage.
 
@@ -88,7 +88,8 @@ In order to run the demo, the script expects the following evironment:
 
 11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into mysql pod and show users
 
-        kubectl exec -it mysql-... /bin/sh
+        MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
+        kubectl exec -it $MYSQL_POD /bin/sh
         # once in the pod execute:
         while true; do clear; date; echo "select user from user;"|mysql -uroot -pmypass -Dmysql; sleep 2; done
 
@@ -104,7 +105,7 @@ In order to run the demo, the script expects the following evironment:
 13. jump into the vault agent pod and start vault agent with `vault-agent.hcl` config:
 
         vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
-        POD=demo-app-... # set to your pod's name
+        POD=$(kubectl get pod -l app=demo-app -o jsonpath="{.items[0].metadata.name}")
         kubectl cp vault-agent.hcl $POD:/tmp
 
         kubectl exec -it $POD /bin/sh
