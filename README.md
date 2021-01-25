@@ -48,43 +48,57 @@ In order to run the demo, the script expects the following evironment:
 
 5. go back to your original terminal and initialize vault with
 
-      ./demo init_vault
-
+        ./demo init_vault
+     export VAULT_ADDR=http://localhost:8200
+        vault status
+   
    this will show you the output that vault will give you and store this output in a file called `keys` for later usage.
+   
+7. in order to talk to vault, we need a token which can be set with the env var `VAULT_TOKEN` and the vault address. Set these env variables by executing
+
+       eval $(./demo set_vault_env)
+       vault status
+
+5. execute `vault status`
+
+5. go to http://localhost:8200/ui show that vault is sealed
+
 
 6. unseal vault with the given unsealing keys (the demo script uses the `keys` file for this)
 
        ./demo unseal_vault 1
        ./demo unseal_vault 2
-       ./demo unseal_vault 3
+       ./demo unseal_vault 3  # alternatively, do this in the browser
 
-7. in order to talk to vault, we need a token which can be set with the env var `VAULT_TOKEN` and the vault address. Set these env variables by executing
-
-       eval $(./demo set_vault_env)
-       vault status
 
 8. enable the key/value secrets storage, set a value and retrieve it from the key value store
 
        ./demo enable_kv_secret_backend
         vault kv put kv/foo foo=bar bar=baz
         vault kv get kv/foo
+        vault kv get --format=json kv/foo
 
-9. create a user called foo with creds foo/bar, try to read kv (which is denied), apply policy, try to get value again and it works
+9. 
 
-       ./demo create_vault_user
+  - create a user called `foo` with creds `foo/bar`
+  - try to read kv (which is denied)
+  - apply policy
+  - try to get value again and it works
+
+        ./demo create_vault_user
         vault login -method=userpass username=foo password=bar # shows a login
         export USER_TOKEN=$(vault login -token-only -method=userpass username=foo password=bar)
         VAULT_TOKEN=$USER_TOKEN vault kv get kv/foo            # this will fail with a permission denied
-
+           
         cat kv-foo.hcl
         vault policy write kv-foo kv-foo.hcl
         VAULT_TOKEN=$USER_TOKEN vault kv get kv/foo            # should work now
 
 10. enable mysql backend
 
-        ./demo enable_mysql
-        vault read database/creds/testdb-rw
-        vault read database/creds/testdb-rw # username / password differs from first request
+       ./demo enable_mysql
+       vault read database/creds/testdb-rw
+       vault read database/creds/testdb-rw # username / password differs from first request
 
 11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into mysql pod and show users
 
@@ -92,11 +106,11 @@ In order to run the demo, the script expects the following evironment:
         kubectl exec -it $MYSQL_POD /bin/sh
         # once in the pod execute:
         while true; do clear; date; echo "select user from user;"|mysql -uroot -pmypass -Dmysql; sleep 2; done
-
+        
         # back in your original terminal execute and see, how new mysql users pop up and vanish after 10 seconds
-        vault read database/creds/testdb-rw
-        vault read database/creds/testdb-rw
-        vault read database/creds/testdb-rw
+        vault read -format=json database/creds/testdb-rw
+        vault read -format=json database/creds/testdb-rw
+        vault read -format=json database/creds/testdb-rw
 
 12. enable kubernetes authentication backend
 
@@ -107,14 +121,18 @@ In order to run the demo, the script expects the following evironment:
         vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
         POD=$(kubectl get pod -l app=demo-app -o jsonpath="{.items[0].metadata.name}")
         kubectl cp vault-agent.hcl $POD:/tmp
-
+        
         kubectl exec -it $POD /bin/sh
-
+        
         apk add --no-cache curl jq
         export JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token )
-        curl -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login
-
+        curl -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' 
+        curl -H"X-Vault-Token: ${VAULT_TOKEN}" -XGET $VAULT_ADDR/v1/database/creds/testdb-ro|jq
+        http://vault:8200/v1/auth/kubernetes/login
+        
         export VAULT_ADDR=http://vault:8200
         export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
         vault read database/creds/testdb-ro
+        
+        vault agent -config /tmp/vault-agent.hcl
 

@@ -6,8 +6,9 @@ INGRESS_PORT_HTTP=81   # must not be used by somebody else
 INGRESS_PORT_HTTPS=444 # must not be used by somebody else
 
 _functions() {
-  grep '\(^[A-Za-z].*()[ ]*{\|^###*$\)' $0|grep -v '^__'|sed -e 's/^/	/g' -e "s/^###*/\\\n/g"|tr -d '(){#'
+  grep '\(^[A-Za-z].*()[ ]*{\|^###*$\)' $0|grep -v '^__'|sed -e 's/^/	/g' -e "s/^###*/\\\n/g" -e 's/()//g'|tr -d '{#'
 }
+
 
 _usage() {
   cat<<EOF
@@ -16,6 +17,15 @@ Usage: $0 COMMAND
 available commands:
   $(echo "$(_functions)")
 EOF
+}
+
+compl() {                        # print code for bash completion; execute with eval
+  echo "$0"|grep "^\." > /dev/null && local exe=$0 || local exe=$(basename $0)
+  local compl_func_name=_$(echo $(basename $0)|tr ' -' '_')
+  local func_names=$(_functions|grep -v "compl "|sed 's/ *#.*$//g'|cut -f1 -d" "|tr -d '\n')
+
+  echo "execute this function with 'eval \$(${exe} compl)'" >&2
+  echo "$compl_func_name() { COMPREPLY=( \$(compgen -W \"${func_names}\" -- \${COMP_WORDS[COMP_CWORD]}) ); }; complete -F ${compl_func_name} ${exe}"
 }
 
 _wait() {
@@ -122,6 +132,7 @@ unseal_vault() {                 # unseal vault
 set_vault_env() {                # get and export vault token and vault addr
   local token=$(cat keys|grep "Token:"|cut -f2 -d:)
   : ${token}
+  set -x
   echo "export VAULT_TOKEN='${token}'"
   echo "export VAULT_ADDR='${VAULT_ADDR}'"
 }
