@@ -35,6 +35,7 @@ install_vault() {                # install local vault cli (mac os only) #
   which vault &>/dev/null || brew install vault
 }
 
+
 #####################
 
 launch_kind_cluster() {          # launch kind cluster for experimentation
@@ -207,7 +208,7 @@ enable_k8s_auth() {              # enables kubernetes authentication
 
   (set -x
   vault write auth/kubernetes/role/test \
-    bound_service_account_names=default \
+    bound_service_account_names="default,demo-app-sa" \
     bound_service_account_namespaces=default \
     policies=testdb-ro \
     ttl=1h
@@ -226,4 +227,3 @@ export VAULT_ADDR=${VAULT_ADDR:=http://localhost:8200}
 test -e ${KINDCONFIG} && export KUBECONFIG=${KINDCONFIG}
 
 "$@"
-
