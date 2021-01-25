@@ -40,7 +40,7 @@ template {
 for _ in $(seq 1 50); do echo; done
 date
 set -x
-echo "show tables;"|mysql -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmysql
+echo "show databases;"|mysql -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmysql
   {{ end }}
 EOH
 }
