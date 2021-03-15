@@ -132,9 +132,17 @@ unseal_vault() {                 # unseal vault
 set_vault_env() {                # get and export vault token and vault addr
   local token=$(cat keys|grep "Token:"|cut -f2 -d:)
   : ${token}
-  set -x
   echo "export VAULT_TOKEN='${token}'"
   echo "export VAULT_ADDR='${VAULT_ADDR}'"
+  echo "export TF_VAR_vault_token='${token}'"
+  echo "export TF_VAR_vault_addr='${VAULT_ADDR}'"
+  echo "export TF_VAR_kubeconfig=$PWD/kind.kubeconfig"
+}
+
+install_vault_controller() {     # installs vault connector
+  helm repo add hashicorp https://helm.releases.hashicorp.com
+  helm install vault hashicorp/vault \
+      --set "injector.externalVaultAddr=http://external-vault:8200"
 }
 
 enable_audit_log() {             # enables audit log for vault

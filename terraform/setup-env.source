@@ -1,0 +1,8 @@
+export KUBE_HOST=$KUBERNETES_SERVICE_HOST:443
+export KUBE_CLUSTER_CA_CERT_DATA=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt )
+export KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token )
+export TF_VAR_vault_addr=http://vault.default:9200
+export TF_VAR_vault_token=$(cat /vault/secrets/token )
+export TF_VAR_kubeconfig=""
+export TF_VAR_vault_addr=http://vault.default:8200
+terraform init

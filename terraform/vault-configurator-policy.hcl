@@ -38,6 +38,10 @@ path "secret/*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
 }
 
+path "admin/secrets/*" {
+  capabilities = ["read"]
+}
+
 # Manage transit secrets engine
 path "transit/*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]

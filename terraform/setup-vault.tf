@@ -1,4 +1,25 @@
-provider vault {}
+variable "vault_addr" {
+  type    = string
+  default = null
+  validation {
+    condition     = var.vault_addr != null
+    error_message = "Either call with '--set vault_addr=https://<vault endpoint>' or set $TF_VAR_vault_addr respectively."
+  }
+}
+
+variable "vault_token" {
+  type    = string
+  default = null
+  validation {
+    condition     = var.vault_token != null
+    error_message = "Either call with '--set vault_token=<vault token>' or set $TF_VAR_vault_token respectively."
+  }
+}
+
+provider vault {
+  address = var.vault_addr
+  token = var.vault_token
+}
 
 resource "vault_auth_backend" "kubernetes" {
   type = "kubernetes"

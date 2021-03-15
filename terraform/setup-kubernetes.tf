@@ -1,12 +1,18 @@
-provider "kubernetes" {
+variable "kubeconfig" {
+  type    = string
+  default = null
+  validation {
+    condition     = var.kubeconfig != null
+    error_message = "Either call with '--set kubeconfig=<path>' or set TF_VAR_kubeconfig to your kubeconfig."
+  }
 }
 
-resource "kubernetes_namespace" "vault_configurator" {
-  metadata {
-    annotations = {
-      created-by = "terraform:bootstrap"
-    }
+provider "kubernetes" {
+  config_path = try(var.kubeconfig)
+}
 
+data "kubernetes_namespace" "vault_configurator" {
+  metadata {
     name = "vault-configurator"
   }
 }
@@ -18,7 +24,7 @@ resource "kubernetes_service_account" "vault_auth" {
     }
 
     name = "vault-auth"
-    namespace = kubernetes_namespace.vault_configurator.metadata[0].name
+    namespace = data.kubernetes_namespace.vault_configurator.metadata[0].name
   }
 }
 
@@ -40,7 +46,7 @@ resource "kubernetes_cluster_role_binding" "vault_auth_token_reviewer" {
   subject {
     kind = "ServiceAccount"
     name = kubernetes_service_account.vault_auth.metadata[0].name
-    namespace = kubernetes_namespace.vault_configurator.metadata[0].name
+    namespace = data.kubernetes_namespace.vault_configurator.metadata[0].name
   }
 }
 
@@ -58,7 +64,7 @@ resource "kubernetes_service_account" "terraform" {
     }
 
     name = "terraform"
-    namespace = kubernetes_namespace.vault_configurator.metadata[0].name
+    namespace = data.kubernetes_namespace.vault_configurator.metadata[0].name
   }
 }
 
@@ -69,7 +75,7 @@ resource "kubernetes_role" "terraform_state_manager" {
     }
 
     name = "TerraformStateManager"
-    namespace = kubernetes_namespace.vault_configurator.metadata[0].name
+    namespace = data.kubernetes_namespace.vault_configurator.metadata[0].name
   }
 
   rule {
@@ -88,14 +94,19 @@ resource "kubernetes_role_binding" "terraform_state_manager" {
     }
 
     name = "TerraformStateManager"
-    namespace = kubernetes_namespace.vault_configurator.metadata[0].name
+    namespace = data.kubernetes_namespace.vault_configurator.metadata[0].name
   }
 
   role_ref {
     api_group = "rbac.authorization.k8s.io"
-    kind = "Role"
-    name = "TerraformStateManager"
+    kind = "ClusterRole"
+    name = "cluster-admin"
   }
+  #role_ref {
+  #  api_group = "rbac.authorization.k8s.io"
+  #  kind = "Role"
+  #  name = "TerraformStateManager"
+  #}
 
   subject {
     kind = "ServiceAccount"
