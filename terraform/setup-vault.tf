@@ -33,12 +33,6 @@ resource "vault_kubernetes_auth_backend_config" "k8sCluster" {
   disable_iss_validation = "true"
 }
 
-# Create admin policy in the root namespace
-resource "vault_policy" "vault_configurator" {
-  name   = "vault_configurator"
-  policy = file("vault-configurator-policy.hcl")
-}
-
 # path where admins can save passwords
 resource "vault_mount" "admin" {
   path        = "admin/secrets"

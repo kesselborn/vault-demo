@@ -1,9 +1,10 @@
 locals {
   name = "project1"
+  path = "/projects/project1"
 }
 
 resource "vault_mount" "project1_db" {
-  path        = "/${local.name}/${local.name}-db"
+  path        = "${local.path}/db"
   type        = "database"
 }
 
@@ -87,7 +88,7 @@ resource "vault_kubernetes_auth_backend_role" "project" {
 }
 
 resource "vault_mount" "project1_secrets" {
-  path        = "project1/secrets"
+  path        = "${local.path}/secrets"
   type        = "generic"
   description = "static secrets for project1"
 }
@@ -96,7 +97,7 @@ resource "vault_policy" "project1_k8s_service_account" {
   name = "project1-k8s-service-account"
   policy = <<EOT
 
-path "project1/*" {
+path "${local.path}/*" {
   capabilities = ["read", "list"]
 }
 
@@ -107,7 +108,7 @@ resource "vault_policy" "project1_dev" {
   name = "project1-dev"
   policy = <<EOT
 
-path "project1/secrets/*" {
+path "${vault_mount.project1_secrets.path}" {
   capabilities = ["create", "update"]
 }
 
@@ -124,6 +125,7 @@ output "project1" {
     policy_for_service_account = vault_policy.project1_k8s_service_account.name
     secrets_backend_path = vault_mount.project1_secrets.path
     project_db_ro_creds_path = "${vault_database_secret_backend_role.project1_db_ro.backend}/creds/${vault_database_secret_backend_role.project1_db_ro.name}"
+    project_db_connection = vault_database_secret_backend_connection.project1_db.backend
     project_db_ro_policy = vault_policy.project1_db_ro.name
     project_db_root_credentials_username = "${data.vault_generic_secret.project1_db.path}['username']"
     project_db_root_credentials_password = "${data.vault_generic_secret.project1_db.path}['password']"

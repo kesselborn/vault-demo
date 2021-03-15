@@ -2,6 +2,9 @@
 
 ## Bootstrapping
 
+Start the demo cluster and port forward vault.
+
+    eval $(./demo set_vault_env)
     kubectl create namespace vault-configurator && \
     terraform init && \
     terraform apply -target=vault_mount.admin -auto-approve
@@ -15,6 +18,7 @@ Run terraform plan and fix the errors -- usually missing credentials that need t
 ## Destroying
 
     terraform destroy && \
+    ../demo reset_mysql_passwd && \
     kubectl delete namespace vault-configurator
 
 

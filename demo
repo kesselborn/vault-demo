@@ -136,7 +136,8 @@ set_vault_env() {                # get and export vault token and vault addr
   echo "export VAULT_ADDR='${VAULT_ADDR}'"
   echo "export TF_VAR_vault_token='${token}'"
   echo "export TF_VAR_vault_addr='${VAULT_ADDR}'"
-  echo "export TF_VAR_kubeconfig=$PWD/kind.kubeconfig"
+  # echo "export TF_VAR_kubeconfig=$PWD/kind.kubeconfig"
+  echo "export KUBE_CONFIG_PATH=$PWD/kind.kubeconfig"
 }
 
 install_vault_controller() {     # installs vault connector
@@ -203,6 +204,10 @@ enable_mysql() {                 # enables mysql secrets engine and configuratio
   (set -x
   vault read database/creds/testdb-rw
   )
+}
+
+reset_mysql_passwd() {           # resets the mysql password (which was potentially changed by vault)
+  kubectl exec -n default svc/mysql -- sh -c "echo \"alter user 'root'@'%' identified by 'mypass';flush privileges;\"|mysql -uroot -pmypass";
 }
 
 enable_k8s_auth() {              # enables kubernetes authentication

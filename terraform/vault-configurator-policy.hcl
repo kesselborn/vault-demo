@@ -3,6 +3,10 @@ path "auth/*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
 }
 
+path "projects/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
 # Create, update, and delete auth methods
 path "sys/auth/*" {
   capabilities = ["create", "update", "delete", "sudo"]
