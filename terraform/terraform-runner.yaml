@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    job-name: terraform-runner
+  name: terraform-runner
+  namespace: vault-configurator
+spec:
+  backoffLimit: 4
+  completions: 1
+  manualSelector: false
+  parallelism: 1
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-token: "true"
+        vault.hashicorp.com/log-level: debug
+        vault.hashicorp.com/role: terraform-runner
+      labels:
+        job-name: terraform-runner
+    spec:
+      containers:
+      - command:
+        - sh
+        - -c
+        - source setup-env.source && terraform plan && terraform apply -auto-approve
+        image: terraform-runner
+        imagePullPolicy: IfNotPresent
+        name: terraform-runner
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      serviceAccount: terraform
+      serviceAccountName: terraform

@@ -67,6 +67,7 @@ resource "kubernetes_namespace" "project1" {
   }
 }
 
+
 resource "kubernetes_service_account" "project1" {
   metadata {
     annotations = {
@@ -91,6 +92,24 @@ resource "vault_mount" "project1_secrets" {
   path        = "${local.path}/secrets"
   type        = "generic"
   description = "static secrets for project1"
+}
+
+resource "vault_generic_secret" "example" {
+  path = "${vault_mount.project1_secrets.path}/foo"
+  disable_read = true
+
+  data_json = <<EOT
+{
+  "foo": "foobar3333"
+}
+EOT
+#  lifecycle {
+#    ignore_changes = [
+#      data_json,
+#    ]
+#  }
+
+
 }
 
 resource "vault_policy" "project1_k8s_service_account" {

@@ -1,5 +1,5 @@
 resource "kubernetes_job" "terraform-runner" {
-  count = 1
+  count = 0
   metadata {
     name      = "terraform-runner"
     namespace = "vault-configurator"
@@ -23,7 +23,7 @@ resource "kubernetes_job" "terraform-runner" {
           image_pull_policy = "IfNotPresent"
           name    = "terraform-runner"
           image   = "terraform-runner"
-          command = ["tail", "-f", "/dev/null"]
+          command = ["sh", "-c", "source setup-env.source && terraform plan && terraform apply -auto-approve"]
         }
 
         restart_policy = "Never"
