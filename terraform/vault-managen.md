@@ -92,7 +92,7 @@ markiert oder bei anderen resourcen mit:
 ```
   lifecycle {
     ignore_changes = [
-      <property>,
+      /team1/app1/api-key,
     ]
   }
 
