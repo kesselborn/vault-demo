@@ -92,7 +92,7 @@ markiert oder bei anderen resourcen mit:
 ```
   lifecycle {
     ignore_changes = [
-      <property>,
+      /team1/app1/api-key,
     ]
   }
 
@@ -105,4 +105,3 @@ ignoriert. So kann erreicht werden, dass diese Secrets nicht im State-File lande
 - Liste der Arten von Secrets, die gespeichert werden müssen erstellen
 - evtl. eine Art Tagging von Resourcen, die Terraform ignoriert und die deshalb händisch gesetzt werden müssen
 - entscheiden, ob Kubernetes-Operationen teilweise auch mit Terraform durchgeführt werden sollen oder nicht
-- PoC demonstrieren, PoC bei Verbund implementieren
