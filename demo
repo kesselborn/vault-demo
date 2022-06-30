@@ -35,10 +35,24 @@ _wait() {
   fi
 }
 
+_download_github_release() {
+  local repo; repo=$1
+  local artifact_name; artifact_name=$(basename "${repo}")
+
+  local latest_version; latest_version=$(basename "$(curl -fs -o/dev/null -w "%{redirect_url}" "https://github.com/${repo}/releases/latest")")
+  local basename; basename=${artifact_name}-$(uname)-$(uname -m|sed 's/x86_64/amd64/')
+
+  (set -x; curl -LO "https://github.com/${repo}/releases/download/${latest_version}/${basename}")
+  curl -LO "https://github.com/${repo}/releases/download/${latest_version}/${basename}.sha256sum"
+  sha256sum -c "${basename}".sha256sum
+
+  mv "${basename}" "${artifact_name}"
+  chmod +x ./"${artifact_name}"
+}
+
 _install_kind() {
   test -e ./kind && return
-  curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.6.1/kind-$(uname)-amd64
-  chmod +x ./kind
+  _download_github_release kubernetes-sigs/kind
 }
 
 install_vault() {                # install local vault cli (mac os only) #
@@ -52,7 +66,7 @@ launch_kind_cluster() {          # launch kind cluster for experimentation
   set -e
   _install_kind
   KUBECONFIG=${KINDCONFIG} kubectl cluster-info &>/dev/null && return
-  cat<<-EOF>kind.conf
+  cat<<-EOF >kind.conf
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -85,7 +99,7 @@ nodes:
   )
 }
 
-install_kubernetes_apps() {      # installs demo apps (vault, mysql, ...)
+install_kubernetes_apps() {      # installs demo apps (vault, mariadb, ...)
   ls *.yaml|xargs -n1 kubectl apply -f
 }
 
@@ -114,8 +128,8 @@ install_ingress_controller() {   # installs and sets up ingress controller
 }
 
 ################
-install_k8s_pods() {             # installs vault, mysql and demo app to kubernetes
-  (set -x; ls mysql.yaml vault.yaml demo-app.yaml|xargs -n1 kubectl apply -f)
+install_k8s_pods() {             # installs vault, mariadb and demo app to kubernetes
+  (set -x; ls mariadb.yaml vault.yaml demo-app.yaml|xargs -n1 kubectl apply -f)
 }
 
 init_vault() {                   # init vault
@@ -151,7 +165,7 @@ create_vault_user() {            # create username/password auth with foo/bar us
   _wait
   (set -x; vault write auth/userpass/users/foo \
     password=bar \
-    policies=testdb-ro,kv-foo
+    "policies=testdb-ro,kv-foo"
   )
   _wait
   (set -x
@@ -161,14 +175,14 @@ create_vault_user() {            # create username/password auth with foo/bar us
   )
 }
 
-enable_mysql() {                 # enables mysql secrets engine and configuration
+enable_mariadb() {                 # enables mariadb secrets engine and configuration
   (set -x; vault secrets enable database)
   _wait
 
   (set -x
   vault write database/config/testdb \
     plugin_name=mysql-database-plugin \
-    connection_url="{{username}}:{{password}}@tcp(mysql:3306)/" \
+    connection_url="{{username}}:{{password}}@tcp(mariadb:3306)/" \
     allowed_roles="testdb-ro,testdb-rw" \
     username="root" \
     password="mypass"
@@ -205,15 +219,14 @@ enable_k8s_auth() {              # enables kubernetes authentication
   (set -x; vault auth enable kubernetes)
   _wait
 
-  local vault_auth_sa_secret=$(kubectl get sa vault-auth -ojson|jq -r ".secrets[0].name")
-  local ca=$(kubectl get secret ${vault_auth_sa_secret} -ojson|jq -r ".data[\"ca.crt\"]"|base64 --decode)
-  local token=$(kubectl get secret ${vault_auth_sa_secret} -ojson|jq -r ".data.token"|base64 --decode)
+  local ca=$(kubectl get secret vault-auth-secret -ojsonpath="{.data.ca}"|base64 --decode)
+  local token=$(kubectl get secret vault-auth-secret -ojsonpath="{.data.token}"|base64 --decode)
 
   (set -x
   vault write auth/kubernetes/config \
-    token_reviewer_jwt="${token}" \
-    kubernetes_host=https://kubernetes \
-    kubernetes_ca_cert="${ca}"
+    "token_reviewer_jwt=${token}" \
+    "kubernetes_host=https://kubernetes" \
+    "kubernetes_ca_cert=${ca}"
   )
   _wait
 

@@ -4,33 +4,33 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: mysql
-  name: mysql
+    app: mariadb
+  name: mariadb
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mysql
+      app: mariadb
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: mysql
+        app: mariadb
     spec:
       containers:
-      - image: mysql
+      - image: mariadb
         imagePullPolicy: IfNotPresent
-        name: mysql
+        name: mariadb
         resources: {}
         env:
-          - {name: MYSQL_ROOT_PASSWORD,value: mypass}
-          - {name: MYSQL_DATABASE,value: testdb}
-          - {name: MYSQL_USER,value: testuser}
-          - {name: MYSQL_PASSWORD,value: testpw}
+          - {name: MARIADB_ROOT_PASSWORD,value: mypass}
+          - {name: MARIADB_DATABASE,value: testdb}
+          - {name: MARIADB_USER,value: testuser}
+          - {name: MARIADB_PASSWORD,value: testpw}
         ports:
           - containerPort: 3306
-            name: mysql
+            name: mariadb
 status: {}
 ---
 apiVersion: v1
@@ -38,16 +38,16 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: mysql
-  name: mysql
+    app: mariadb
+  name: mariadb
 spec:
   ports:
-  - name: 3306-mysql
+  - name: 3306-mariadb
     port: 3306
     protocol: TCP
-    targetPort: mysql
+    targetPort: mariadb
   selector:
-    app: mysql
+    app: mariadb
   type: ClusterIP
 status:
   loadBalancer: {}

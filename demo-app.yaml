@@ -23,13 +23,13 @@ spec:
       containers:
       - image: vault
         imagePullPolicy: IfNotPresent
-        name: vault-agent
+        name: Vault-agent
         command: ["/usr/bin/tail", "-f", "/dev/null"]
         resources: {}
         volumeMounts:
           - name: shared
             mountPath: /config
-      - image: mysql
+      - image: mariadb
         imagePullPolicy: IfNotPresent
         name: app
         resources: {}
@@ -40,7 +40,7 @@ spec:
             echo "waiting for script to become available"
             while true
             do
-              test -e /config/mysql-script && /config/mysql-script
+              test -e /config/mariadb-script && /config/mariadb-script
               sleep 1
             done
         volumeMounts:

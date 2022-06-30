@@ -1,7 +1,7 @@
 # Vault demo
 
-This is a little vault demo. It uses Kind (Kubernetes in Docker) in order spin up vault, mysql and a demo app.
-The demo sets up a vault and enables several secret and auth backends. Finally, it demos how to deploy an app in Kubernetes using dynamic secrets for the mysql backen.
+This is a little vault demo. It uses Kind (Kubernetes in Docker) in order spin up vault, mariadb and a demo app.
+The demo sets up a vault and enables several secret and auth backends. Finally, it demos how to deploy an app in Kubernetes using dynamic secrets for the mariadb backen.
 This README has just the steps to execute (an elaborate note-to-self) and not a lot of explainations.
 
 # Usage
@@ -25,21 +25,21 @@ In order to run the demo, the script expects the following evironment:
        ./demo launch_kind_cluster
        export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
 
-3. install vault, mysql and the demo app into the kubernetes cluster (it basically applies vault.yaml, mysql.yaml, demo-app.yaml)
+3. install vault, mariadb and the demo app into the kubernetes cluster (it basically applies vault.yaml, mariadb.yaml, demo-app.yaml)
 
        ./demo install_k8s_pods
        kubectl get pods
 
-  if you are in an offline situation and you have the docker images mysql and vault locally available, you can upload then into your kind cluster by executing
+  if you are in an offline situation and you have the docker images mariadb and vault locally available, you can upload then into your kind cluster by executing
 
        ./demo load_image vault
-       ./demo load_image mysql
+       ./demo load_image mariadb
 
    wait until all pods are in state running:
 
        $ kubectl get pods
        demo-app-84b77c7f9-zdpd4   2/2     Running   0          3m19s
-       mysql-f998d4f87-m8wf8      1/1     Running   0          3m19s
+       mariadb-f998d4f87-m8wf8    1/1     Running   0          3m19s
        vault-5558555bd8-7cppv     1/1     Running   0          32s
 
 4. in order to be able to talk to the vault within the kubernetes cluster, we need to create a tunnel. Open another terminal and execute (within the demo folder)
@@ -50,7 +50,7 @@ In order to run the demo, the script expects the following evironment:
 5. go back to your original terminal and initialize vault with
 
         ./demo init_vault
-     export VAULT_ADDR=http://localhost:8200
+        export VAULT_ADDR=http://localhost:8200
         vault status
    
    this will show you the output that vault will give you and store this output in a file called `keys` for later usage.
@@ -67,48 +67,49 @@ In order to run the demo, the script expects the following evironment:
 
 6. unseal vault with the given unsealing keys (the demo script uses the `keys` file for this)
 
-       ./demo unseal_vault 1
-       ./demo unseal_vault 2
-       ./demo unseal_vault 3  # alternatively, do this in the browser
+        ./demo unseal_vault 1
+        ./demo unseal_vault 2
+        ./demo unseal_vault 3  # alternatively, do this in the browser
 
 
 8. enable the key/value secrets storage, set a value and retrieve it from the key value store
 
-       ./demo enable_kv_secret_backend
+        ./demo enable_kv_secret_backend
         vault kv put kv/foo foo=bar bar=baz
         vault kv get kv/foo
         vault kv get --format=json kv/foo
 
 9. 
-
   - create a user called `foo` with creds `foo/bar`
   - try to read kv (which is denied)
   - apply policy
   - try to get value again and it works
 
+
         ./demo create_vault_user
         vault login -method=userpass username=foo password=bar # shows a login
         export USER_TOKEN=$(vault login -token-only -method=userpass username=foo password=bar)
         VAULT_TOKEN=$USER_TOKEN vault kv get kv/foo            # this will fail with a permission denied
-           
+      
         cat kv-foo.hcl
         vault policy write kv-foo kv-foo.hcl
         VAULT_TOKEN=$USER_TOKEN vault kv get kv/foo            # should work now
 
-10. enable mysql backend
+10. enable mariadb backend
 
-       ./demo enable_mysql
-       vault read database/creds/testdb-rw
-       vault read database/creds/testdb-rw # username / password differs from first request
+        ./demo enable_mariadb
+        vault read database/creds/testdb-rw
+        vault read database/creds/testdb-rw # username / password differs from first request
 
-11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into mysql pod and show users
+11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into mariadb pod and show users
 
-        MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
-        kubectl exec -it $MYSQL_POD /bin/sh
+        export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
+        MARIADB_POD=$(kubectl get pod -l app=mariadb -o jsonpath="{.items[0].metadata.name}")
+        kubectl exec -it $MARIADB_POD /bin/sh
         # once in the pod execute:
-        while true; do clear; date; echo "select user from user;"|mysql -uroot -pmypass -Dmysql; sleep 2; done
+        while true; do clear; date; echo "select user from user;"|mariadb -uroot -pmypass -Dmysql; sleep 2; done
         
-        # back in your original terminal execute and see, how new mysql users pop up and vanish after 10 seconds
+        # back in your original terminal execute and see, how new mariadb users pop up and vanish after 10 seconds
         vault read -format=json database/creds/testdb-rw
         vault read -format=json database/creds/testdb-rw
         vault read -format=json database/creds/testdb-rw
@@ -126,13 +127,19 @@ In order to run the demo, the script expects the following evironment:
         kubectl exec -it $POD /bin/sh
         
         apk add --no-cache curl jq
+        cat /var/run/secrets/kubernetes.io/serviceaccount/token
         export JWT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token )
-        curl -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' 
-        curl -H"X-Vault-Token: ${VAULT_TOKEN}" -XGET $VAULT_ADDR/v1/database/creds/testdb-ro|jq
-        http://vault:8200/v1/auth/kubernetes/login
         
         export VAULT_ADDR=http://vault:8200
-        export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
+        curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login
+        
+        # does not work
+        vault read database/creds/testdb-ro
+        
+        export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' 
+        http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
+        
+        # now it works
         vault read database/creds/testdb-ro
         
         vault agent -config /tmp/vault-agent.hcl

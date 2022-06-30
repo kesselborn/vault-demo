@@ -32,7 +32,7 @@ EOH
 }
 
 template {
-  destination = "/config/mysql-script"
+  destination = "/config/mariadb-script"
   perms       = 0755
 
   contents = <<EOH
@@ -40,7 +40,7 @@ template {
 for _ in $(seq 1 50); do echo; done
 date
 set -x
-echo "show databases;"|mysql -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmysql
+echo "show databases;"|mariadb -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmariadb
   {{ end }}
 EOH
 }
