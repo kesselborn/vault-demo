@@ -144,7 +144,7 @@ In order to run the demo, the script expects the following evironment:
 
 **OR** enable postgres backend
 
-        ./demo enable_mariadb
+        ./demo enable_postgres
         vault read database/creds/testdb-rw
         vault read database/creds/testdb-rw # username / password differs from first request
 
