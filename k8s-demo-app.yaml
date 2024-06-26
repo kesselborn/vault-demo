@@ -23,7 +23,7 @@ spec:
       containers:
         - image: hashicorp/vault
           imagePullPolicy: IfNotPresent
-          name: vault-agent
+          name: vaultagent
           command: ["/usr/bin/tail", "-f", "/dev/null"]
           resources: {}
           volumeMounts:
@@ -31,7 +31,7 @@ spec:
               mountPath: /config
         - image: mariadb
           imagePullPolicy: IfNotPresent
-          name: mysql-app
+          name: mysqlapp
           resources: {}
           command:
             - sh
@@ -48,7 +48,7 @@ spec:
               mountPath: /config
         - image: postgres
           imagePullPolicy: IfNotPresent
-          name: postgres-app
+          name: postgresapp
           resources: {}
           command:
             - sh
