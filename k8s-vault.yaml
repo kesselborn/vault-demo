@@ -19,7 +19,7 @@ spec:
         app: vault
     spec:
       containers:
-      - image: vault
+      - image: hashicorp/vault
         imagePullPolicy: IfNotPresent
         env:
           - name: VAULT_LOCAL_CONFIG

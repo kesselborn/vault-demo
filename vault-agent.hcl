@@ -21,12 +21,12 @@ auto_auth {
 }
 
 template {
-  destination = "/config/db.properties"
+  destination = "/config/.env"
 
   contents = <<EOH
   {{- with secret "database/creds/testdb-ro" }}
-db.username={{ .Data.username }}
-db.password={{ .Data.password }}
+DB_USERNAME={{ .Data.username }}
+DB_PASSWORD={{ .Data.password }}
   {{ end }}
 EOH
 }
@@ -41,6 +41,20 @@ for _ in $(seq 1 50); do echo; done
 date
 set -x
 echo "show databases;"|mariadb -u{{ .Data.username }} -p{{ .Data.password }} -Dtestdb -hmariadb
+  {{ end }}
+EOH
+}
+
+template {
+  destination = "/config/postgres-script"
+  perms       = 0755
+
+  contents = <<EOH
+  {{- with secret "database/creds/testdb-ro" }}
+for _ in $(seq 1 50); do echo; done
+date
+set -x
+echo "select * from testdb;"|psql postgresql://{{ .Data.username}}:{{ .Data.password }}@postgres:5432/postgres
   {{ end }}
 EOH
 }

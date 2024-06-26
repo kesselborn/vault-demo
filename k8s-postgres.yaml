@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: postgres
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - image: postgres
+          imagePullPolicy: IfNotPresent
+          name: postgres
+          resources: {}
+          env:
+            - { name: POSTGRES_PASSWORD, value: mypass }
+          ports:
+            - containerPort: 5432
+              name: postgres
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: postgres
+  name: postgres
+spec:
+  ports:
+    - name: 5432-postgres
+      port: 5432
+      protocol: TCP
+      targetPort: postgres
+  selector:
+    app: postgres
+  type: ClusterIP
+status:
+  loadBalancer: {}

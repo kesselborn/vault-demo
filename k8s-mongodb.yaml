@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mongodb
+  name: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - image: mongo
+          imagePullPolicy: IfNotPresent
+          name: mongodb
+          resources: {}
+          env:
+            - { name: MONGO_INITDB_ROOT_USERNAME, value: mongouser }
+            - { name: MONGO_INITDB_ROOT_PASSWORD, value: mongopass }
+          ports:
+            - containerPort: 27017
+              name: mongodb
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mongodb
+  name: mongodb
+spec:
+  ports:
+    - name: 27017-mongodb
+      port: 27017
+      protocol: TCP
+      targetPort: mongodb
+  selector:
+    app: mongodb
+  type: ClusterIP
+status:
+  loadBalancer: {}

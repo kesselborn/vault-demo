@@ -28,12 +28,14 @@ In order to run the demo, the script expects the following evironment:
 3. install vault, mariadb and the demo app into the kubernetes cluster (it basically applies vault.yaml, mariadb.yaml, demo-app.yaml)
 
        ./demo install_k8s_pods
-       kubectl get pods
+       watch kubectl get pods
 
   if you are in an offline situation and you have the docker images mariadb and vault locally available, you can upload then into your kind cluster by executing
 
-       ./demo load_image vault
+       ./demo load_image hashicorp/vault
        ./demo load_image mariadb
+       ./demo load_image postgres
+       ./demo load_image mongo
 
    wait until all pods are in state running:
 
@@ -47,22 +49,60 @@ In order to run the demo, the script expects the following evironment:
        export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
        kubectl port-forward svc/vault 8200:8200
 
-5. go back to your original terminal and initialize vault with
+5. **GPG**: 
 
-        ./demo init_vault
-        export VAULT_ADDR=http://localhost:8200
-        vault status
+   ```
+   # export public key
+   gpg -o /tmp/gpg.pub --export EMAIL_ADDRESS
    
-   this will show you the output that vault will give you and store this output in a file called `keys` for later usage.
+   # decrypt blob
+   echo 'BLOB'|base64 -d|gpg -d
+   ```
+
+   go back to your original terminal and initialize vault with
+
+   go to http://localhost:8200
+
+       ./demo init_vault
+       export VAULT_ADDR=http://localhost:8200
+       vault status
+
+   ```
+   $ cat keys 
+   Unseal Key 1: CcGugB9WurkLD4AcPVB7IcLktg7hUXkKsuqCRhyLTCWX
+   Unseal Key 2: KmEUc1dEVi7ibupfU5F9nBiU9JG/5+0ALh9hDgz/Wma/
+   Unseal Key 3: SOUV4ebyO/T2Hbep8DNaUSYoGFBBusL3o2ErNNaJ4Sb7
+   Unseal Key 4: 6LiFvNAqL1HgUUn522DCy0lqPwTmZPJiCMCq3Qe8BLTd
+   Unseal Key 5: mOdtim0NDx457phMfGo722rQTNp7WLNj6/TlPeeuCxGR
    
-7. in order to talk to vault, we need a token which can be set with the env var `VAULT_TOKEN` and the vault address. Set these env variables by executing
+   Initial Root Token: hvs.9lZMqX6jN7ipHOr5nVttN7f4
+   
+   Vault initialized with 5 key shares and a key threshold of 3. Please securely
+   distribute the key shares printed above. When the Vault is re-sealed,
+   restarted, or stopped, you must supply at least 3 of these keys to unseal it
+   before it can start servicing requests.
+   
+   Vault does not store the generated root key. Without at least 3 keys to
+   reconstruct the root key, Vault will remain permanently sealed!
+   
+   It is possible to generate new unseal keys, provided you have a quorum of
+   existing unseal keys shares. See "vault operator rekey" for more information.
+   ```
+
+   
+
+   this will show you the output that vault will give you and store this output in a file called `keys` for later usage. Alternatively, go to http://localhost:8200/ui 
+
+   
+
+6. in order to talk to vault, we need a token which can be set with the env var `VAULT_TOKEN` and the vault address. Set these env variables by executing
 
        eval $(./demo set_vault_env)
        vault status
 
-5. execute `vault status`
+7. execute `vault status`
 
-5. go to http://localhost:8200/ui show that vault is sealed
+8. go to http://localhost:8200/ui show that vault is sealed
 
 
 6. unseal vault with the given unsealing keys (the demo script uses the `keys` file for this)
@@ -100,8 +140,15 @@ In order to run the demo, the script expects the following evironment:
         ./demo enable_mariadb
         vault read database/creds/testdb-rw
         vault read database/creds/testdb-rw # username / password differs from first request
+    
 
-11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into mariadb pod and show users
+**OR** enable postgres backend
+
+        ./demo enable_mariadb
+        vault read database/creds/testdb-rw
+        vault read database/creds/testdb-rw # username / password differs from first request
+
+11. open other terminal, set kubeconfig to `$PWD/kind.kubeconfig`, jump into **mariadb** pod and show users
 
         export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
         MARIADB_POD=$(kubectl get pod -l app=mariadb -o jsonpath="{.items[0].metadata.name}")
@@ -113,6 +160,16 @@ In order to run the demo, the script expects the following evironment:
         vault read -format=json database/creds/testdb-rw
         vault read -format=json database/creds/testdb-rw
         vault read -format=json database/creds/testdb-rw
+    
+
+**postgres**
+
+```sh
+kubectl exec -it deploy/postgres /bin/bash
+
+while sleep 5; do
+kubectl exec -it deploy/postgres -- /bin/sh -c "echo '\du'|psql -U postgres"; done
+```
 
 12. enable kubernetes authentication backend
 
@@ -136,14 +193,18 @@ In order to run the demo, the script expects the following evironment:
         # does not work
         vault read database/creds/testdb-ro
         
-        export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' 
-        http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
+        export VAULT_TOKEN=$(curl -s -XPOST -d '{"role": "test", "jwt":"'$JWT'"}' http://vault:8200/v1/auth/kubernetes/login|jq -r ".auth.client_token")
         
         # now it works
         vault read database/creds/testdb-ro
         
         vault agent -config /tmp/vault-agent.hcl
 
+
+```sh
+create table "testdb" (foo int);
+insert into testdb (foo) values (23);
+```
 
 ## Alternative: use Vault-k8s
 
@@ -152,52 +213,63 @@ This example [installs vault with helm](https://github.com/hashicorp/vault-helm)
 1. cleanup cluster (or if you start from here, follow steps 1 and 2 above)
 
 ````
-   kubectl delete -f vault.yaml demo-app.yaml
+kubectl delete -f k8s-vault.yaml; kubectl delete -f k8s-demo-app.yaml
 ````
 
 2. run vault again using helm chart
 
-   ```sh
+```sh
    helm install vault \
        --values vault-values.yaml \
-       https://github.com/hashicorp/vault-helm/archive/v0.5.0.tar.gz
-   ```
+       https://github.com/hashicorp/vault-helm/archive/v0.28.0.tar.gz
 ```
 
 3. start mysql
 
 ```
    kubectl apply -f mysql.yaml
-   ```
+```
 
 4. folllow steps 4-7 above to initiallize vault
 
 5. enable mysql backend
 
-   ```sh
-   ./demo enable_mysql
-   ```
+```sh
+./demo enable_mysql
+```
 
 6. enable kubernetes authentication backend
 
-       ./demo enable_k8s_auth
+```sh
+./demo enable_k8s_auth
+```
 
 7. jump into the vault agent pod and start vault agent with `vault-agent.hcl` config:
 
-   ```sh
-   vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
-   ```
+```sh
+ vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
+```
 
 8. start the demo-app, containing annotations that configure the vault-agent sidecar deployment 
 
    ```sh
    kubectl apply -f demo-app-inject.yaml
-   ```
+   kubectl apply -f demo-app-inject-postgres.yaml
+```
 
    check the logs for users created by the vault-agent sidecar (using the same sidecar)
 
    ```sh
-   DEMO_POD=$(kubectl get pod -l app=demo-app-inject -o jsonpath="{.items[0].metadata.name}")
+   DEMO_POD=$(kubectl get pod -l app=demo-app-postgres-inject -o jsonpath="{.items[0].metadata.name}")
    kubectl logs $DEMO_POD app
-   ```
+```
+
+## Mongodb
+
+```sh
+./demo enable_mongodb
+vault read database/creds/mongo-rw
+
+kubectl exec -it deploy/mongodb -- mongosh --username '...' --password '...' 
+```
 

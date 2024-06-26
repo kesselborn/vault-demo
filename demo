@@ -99,10 +99,6 @@ nodes:
   )
 }
 
-install_kubernetes_apps() {      # installs demo apps (vault, mariadb, ...)
-  ls *.yaml|xargs -n1 kubectl apply -f
-}
-
 
 delete_kind_cluster() {          # deletes the kind cluster
   ./kind delete cluster --name ${CLUSTER_NAME} --kubeconfig ${KINDCONFIG}
@@ -129,7 +125,7 @@ install_ingress_controller() {   # installs and sets up ingress controller
 
 ################
 install_k8s_pods() {             # installs vault, mariadb and demo app to kubernetes
-  (set -x; ls mariadb.yaml vault.yaml demo-app.yaml|xargs -n1 kubectl apply -f)
+  (set -x; ls k8s-*.yaml|xargs -n1 kubectl apply -f)
 }
 
 init_vault() {                   # init vault
@@ -209,6 +205,78 @@ enable_mariadb() {                 # enables mariadb secrets engine and configur
   _wait
   (set -x
   vault read database/creds/testdb-rw
+  )
+}
+
+enable_postgres() {                 # enables mariadb secrets engine and configuration
+  (set -x; vault secrets enable database)
+  _wait
+
+  (set -x
+  vault write database/config/testdb \
+    plugin_name=postgresql-database-plugin \
+    connection_url="postgresql://{{username}}:{{password}}@postgres:5432" \
+    allowed_roles="testdb-ro,testdb-rw" \
+    username="postgres" \
+    password="mypass"
+  )
+
+  vault write database/roles/my-role \
+    db_name="my-postgresql-database" \
+    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+        GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+    default_ttl="1h" \
+    max_ttl="24h"
+
+  _wait
+  (set -x
+  vault write database/roles/testdb-ro \
+    db_name=testdb \
+    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+        GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+    default_ttl="10s" \
+    max_ttl="10s"
+  )
+
+  _wait
+  (set -x
+  vault write database/roles/testdb-rw \
+    db_name=testdb \
+    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+    default_ttl="10s" \
+    max_ttl="10s"
+  )
+
+  _wait
+  (set -x
+  vault read database/creds/testdb-rw
+  )
+}
+
+enable_mongodb() {                 # enables mongodb secrets engine and configuration
+  (set -x; vault secrets enable database || true)
+  _wait
+
+  (set -x
+  vault write database/config/mongodb \
+    plugin_name=mongodb-database-plugin \
+    connection_url="mongodb://{{username}}:{{password}}@mongodb:27017/admin?tls=false" \
+    allowed_roles="mongo-rw" \
+    username="mongouser" \
+    password="mongopass"
+  )
+
+  vault write database/roles/mongo-rw \
+    db_name=mongodb \
+    creation_statements='{ "db": "admin", "roles": [{ "role": "readWrite" }, {"role": "read", "db": "foo"}] }' \
+    default_ttl="1h" \
+    max_ttl="24h"
+
+
+  _wait
+  (set -x
+  vault read database/creds/mongo-rw
   )
 }
 
