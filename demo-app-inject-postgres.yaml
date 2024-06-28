@@ -9,19 +9,19 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: demo-app-postgres-inject
-  name: demo-app-postgres-inject
+    app: demo-app-inject
+  name: demo-app-inject
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-app-postgres-inject
+      app: demo-app-inject
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: demo-app-postgres-inject
+        app: demo-app-inject
       annotations:
         # https://developer.hashicorp.com/vault/docs/platform/k8s/injector
         vault.hashicorp.com/agent-inject: "true"

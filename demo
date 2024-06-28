@@ -252,6 +252,8 @@ enable_postgres() {                 # enables mariadb secrets engine and configu
   (set -x
   vault read database/creds/testdb-rw
   )
+  kubectl exec deploy/postgres -- \
+    /bin/sh -c "echo 'create table \"testdb\" (foo int);insert into testdb (foo) values (23);insert into testdb (foo) values (42);select * from testdb;'|psql -Upostgres"
 }
 
 enable_mongodb() {                 # enables mongodb secrets engine and configuration

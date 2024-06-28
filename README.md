@@ -49,7 +49,7 @@ In order to run the demo, the script expects the following evironment:
        export KUBECONFIG=$PWD/kind.kubeconfig # tell kubectl to use this cluster
        kubectl port-forward svc/vault 8200:8200
 
-5. **GPG**: 
+5. **GPG**: if you want to use gpg for encrypting any keys, do the following (then, scripts below won't work anymore): 
 
    ```
    # export public key
@@ -61,7 +61,7 @@ In order to run the demo, the script expects the following evironment:
 
    go back to your original terminal and initialize vault with
 
-   go to http://localhost:8200
+   or go to http://localhost:8200
 
        ./demo init_vault
        export VAULT_ADDR=http://localhost:8200
@@ -221,21 +221,23 @@ kubectl delete -f k8s-vault.yaml; kubectl delete -f k8s-demo-app.yaml
 ```sh
    helm install vault \
        --values vault-values.yaml \
-       https://github.com/hashicorp/vault-helm/archive/v0.28.0.tar.gz
+       https://github.com/hashicorp/vault-helm/archive/refs/tags/v0.28.0.tar.gz
 ```
 
 3. start mysql
 
 ```
-   kubectl apply -f mysql.yaml
+   kubectl apply -f k8s-mariadb.yaml
+   kubectl apply -f k8s-postgres.yaml
 ```
 
 4. folllow steps 4-7 above to initiallize vault
 
-5. enable mysql backend
+5. enable mariadb **OR** postgres backend
 
 ```sh
-./demo enable_mysql
+./demo enable_mariadb
+./demo enable_postgres
 ```
 
 6. enable kubernetes authentication backend
@@ -250,18 +252,18 @@ kubectl delete -f k8s-vault.yaml; kubectl delete -f k8s-demo-app.yaml
  vault policy write testdb-ro testdb-ro.hcl # give kubernetes default/default right to read db creds
 ```
 
-8. start the demo-app, containing annotations that configure the vault-agent sidecar deployment 
+8. start the mariadb **OR** postgres demo-app, containing annotations that configure the vault-agent sidecar deployment 
 
-   ```sh
-   kubectl apply -f demo-app-inject.yaml
+```sh
+   kubectl apply -f demo-app-inject-mariadb.yaml
    kubectl apply -f demo-app-inject-postgres.yaml
 ```
 
-   check the logs for users created by the vault-agent sidecar (using the same sidecar)
+check the logs for users created by the vault-agent sidecar (using the same sidecar)
 
-   ```sh
-   DEMO_POD=$(kubectl get pod -l app=demo-app-postgres-inject -o jsonpath="{.items[0].metadata.name}")
-   kubectl logs $DEMO_POD app
+```sh
+   DEMO_POD=$(kubectl get pod -l app=demo-app-inject -o jsonpath="{.items[0].metadata.name}")
+   kubectl logs -f $DEMO_POD app
 ```
 
 ## Mongodb
