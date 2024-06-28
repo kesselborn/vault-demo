@@ -9,26 +9,26 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: demo-app-inject
-  name: demo-app-inject
+    app: demo-app-inject-postgres
+  name: demo-app-inject-postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-app-inject
+      app: demo-app-inject-postgres
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: demo-app-inject
+        app: demo-app-inject-postgres
       annotations:
         # https://developer.hashicorp.com/vault/docs/platform/k8s/injector
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "test"
-        vault.hashicorp.com/agent-inject-secret-db: database/creds/testdb-ro
+        vault.hashicorp.com/agent-inject-secret-db: postgres/creds/testdb-ro
         vault.hashicorp.com/agent-inject-template-db: |
-          {{- with secret "database/creds/testdb-ro" }}
+          {{- with secret "postgres/creds/testdb-ro" }}
           for _ in $(seq 1 50); do echo; done
           date
           set -x

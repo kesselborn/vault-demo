@@ -24,9 +24,13 @@ template {
   destination = "/config/.env"
 
   contents = <<EOH
-  {{- with secret "database/creds/testdb-ro" }}
-DB_USERNAME={{ .Data.username }}
-DB_PASSWORD={{ .Data.password }}
+  {{- with secret "mariadb/creds/testdb-ro" }}
+MARIADB_USERNAME={{ .Data.username }}
+MARIADB_PASSWORD={{ .Data.password }}
+  {{ end }}
+  {{- with secret "postgres/creds/testdb-ro" }}
+POSTGRES_USERNAME={{ .Data.username }}
+POSTGRES_PASSWORD={{ .Data.password }}
   {{ end }}
 EOH
 }
@@ -36,7 +40,7 @@ template {
   perms       = 0755
 
   contents = <<EOH
-  {{- with secret "database/creds/testdb-ro" }}
+  {{- with secret "mariadb/creds/testdb-ro" }}
 for _ in $(seq 1 50); do echo; done
 date
 set -x
@@ -50,7 +54,7 @@ template {
   perms       = 0755
 
   contents = <<EOH
-  {{- with secret "database/creds/testdb-ro" }}
+  {{- with secret "postgres/creds/testdb-ro" }}
 for _ in $(seq 1 50); do echo; done
 date
 set -x

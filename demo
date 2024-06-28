@@ -172,11 +172,11 @@ create_vault_user() {            # create username/password auth with foo/bar us
 }
 
 enable_mariadb() {                 # enables mariadb secrets engine and configuration
-  (set -x; vault secrets enable database)
+  (set -x; vault secrets enable -path mariadb database)
   _wait
 
   (set -x
-  vault write database/config/testdb \
+  vault write mariadb/config/testdb \
     plugin_name=mysql-database-plugin \
     connection_url="{{username}}:{{password}}@tcp(mariadb:3306)/" \
     allowed_roles="testdb-ro,testdb-rw" \
@@ -186,7 +186,7 @@ enable_mariadb() {                 # enables mariadb secrets engine and configur
 
   _wait
   (set -x
-  vault write database/roles/testdb-ro \
+  vault write mariadb/roles/testdb-ro \
     db_name=testdb \
     creation_statements="CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT SELECT ON *.* TO '{{name}}'@'%';" \
     default_ttl="10s" \
@@ -195,7 +195,7 @@ enable_mariadb() {                 # enables mariadb secrets engine and configur
 
   _wait
   (set -x
-  vault write database/roles/testdb-rw \
+  vault write mariadb/roles/testdb-rw \
     db_name=testdb \
     creation_statements="CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT ALL ON *.* TO '{{name}}'@'%';" \
     default_ttl="10s" \
@@ -204,16 +204,18 @@ enable_mariadb() {                 # enables mariadb secrets engine and configur
 
   _wait
   (set -x
-  vault read database/creds/testdb-rw
+  vault read mariadb/creds/testdb-rw
   )
+  kubectl exec deploy/mariadb -- \
+    /bin/sh -c "echo 'create table testdb (foo INT);insert into testdb (foo) values (23);insert into testdb (foo) values (42);select * from testdb;'|mariadb -uroot -pmypass -Dtestdb"
 }
 
 enable_postgres() {                 # enables mariadb secrets engine and configuration
-  (set -x; vault secrets enable database)
+  (set -x; vault secrets enable -path postgres database)
   _wait
 
   (set -x
-  vault write database/config/testdb \
+  vault write postgres/config/testdb \
     plugin_name=postgresql-database-plugin \
     connection_url="postgresql://{{username}}:{{password}}@postgres:5432" \
     allowed_roles="testdb-ro,testdb-rw" \
@@ -221,7 +223,7 @@ enable_postgres() {                 # enables mariadb secrets engine and configu
     password="mypass"
   )
 
-  vault write database/roles/my-role \
+  vault write postgres/roles/my-role \
     db_name="my-postgresql-database" \
     creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
         GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
@@ -230,7 +232,7 @@ enable_postgres() {                 # enables mariadb secrets engine and configu
 
   _wait
   (set -x
-  vault write database/roles/testdb-ro \
+  vault write postgres/roles/testdb-ro \
     db_name=testdb \
     creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
         GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
@@ -240,7 +242,7 @@ enable_postgres() {                 # enables mariadb secrets engine and configu
 
   _wait
   (set -x
-  vault write database/roles/testdb-rw \
+  vault write postgres/roles/testdb-rw \
     db_name=testdb \
     creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
         GRANT ALL ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
@@ -250,18 +252,18 @@ enable_postgres() {                 # enables mariadb secrets engine and configu
 
   _wait
   (set -x
-  vault read database/creds/testdb-rw
+  vault read postgres/creds/testdb-rw
   )
   kubectl exec deploy/postgres -- \
     /bin/sh -c "echo 'create table \"testdb\" (foo int);insert into testdb (foo) values (23);insert into testdb (foo) values (42);select * from testdb;'|psql -Upostgres"
 }
 
 enable_mongodb() {                 # enables mongodb secrets engine and configuration
-  (set -x; vault secrets enable database || true)
+  (set -x; vault secrets enable -path mongodb database)
   _wait
 
   (set -x
-  vault write database/config/mongodb \
+  vault write mongodb/config/mongodb \
     plugin_name=mongodb-database-plugin \
     connection_url="mongodb://{{username}}:{{password}}@mongodb:27017/admin?tls=false" \
     allowed_roles="mongo-rw" \
@@ -269,7 +271,7 @@ enable_mongodb() {                 # enables mongodb secrets engine and configur
     password="mongopass"
   )
 
-  vault write database/roles/mongo-rw \
+  vault write mongodb/roles/mongo-rw \
     db_name=mongodb \
     creation_statements='{ "db": "admin", "roles": [{ "role": "readWrite" }, {"role": "read", "db": "foo"}] }' \
     default_ttl="1h" \
@@ -278,7 +280,7 @@ enable_mongodb() {                 # enables mongodb secrets engine and configur
 
   _wait
   (set -x
-  vault read database/creds/mongo-rw
+  vault read mongodb/creds/mongo-rw
   )
 }
 
